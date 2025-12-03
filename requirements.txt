@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+websockets
+python-multipart
+pdfplumber
+google-generativeai
+edge-tts
+pydantic
+gTTS
