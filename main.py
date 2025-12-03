@@ -56,7 +56,7 @@ class InterviewSession:
         
         INTERVIEW STRUCTURE:
         1. Introduction
-        2. DSA & Problem Solving (JD based)-use JD, search internet to determine what questions have been asked in past interviews for this JD.
+        2. DSA & Problem Solving (JD based)-use JD to set tone and difficulty of interview, search internet to determine what questions have been asked in past interviews for this JD.
         3. Resume Deep Dive
         4. Conceptual Questions
         5. Conclusion

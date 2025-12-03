@@ -7,3 +7,4 @@ google-generativeai
 edge-tts
 pydantic
 gTTS
+python-dotenv
