@@ -1,3 +1,4 @@
+from multiprocessing import process
 import os
 import uuid
 import base64
@@ -9,13 +10,15 @@ from gtts import gTTS
 from fastapi import FastAPI, WebSocket, UploadFile, File, Form, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict
+from dotenv import load_dotenv
 
 # --- NEW SDK IMPORTS ---
 from google import genai
 from google.genai import types
 
 # --- CONFIGURATION ---
-GOOGLE_API_KEY = "AIzaSyAZ8CW55iT1Xe7oDJ-qPnFvngn1s83U0nU"
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("API_KEY")
 
 app = FastAPI()
 
