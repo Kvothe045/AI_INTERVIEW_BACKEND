@@ -3,7 +3,7 @@ uvicorn
 websockets
 python-multipart
 pdfplumber
-google-generativeai
+google-genai      
 edge-tts
 pydantic
 gTTS
