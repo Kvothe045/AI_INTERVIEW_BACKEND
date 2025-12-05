@@ -122,10 +122,11 @@ class InterviewSession:
         INTERVIEW STRUCTURE:
         0. Introduction: Say "I am {self.persona['name']}...".
         1. Intro Question: Ask 1 relevant intro/behavioral question.
-        2. Core Technical: Ask 2 rigorous questions based on JD.
-        3. Resume Dive: Ask about specific projects.
-        4. Conceptual: Ask hard standard questions.
-        5. Conclusion.
+        2. **DSA & Problem Solving(if applicable)**: Use the JD to set the difficulty. Minimum 2 main dsa/problem-solving question. Ask rigorous questions with one cross-question on it if seems feasible, always rely on last response.
+        3. **Resume Deep Dive**: Drill down into skills+projects+other key things.
+        4. **Conceptual Questions**: Ask 3 standard medium to medium-hard to hard questions for this role based on internet searches(past experiences).Cross question when needed.
+        6. **System Design**: If for this role in real-world in past system design applicable then, ask 1 system design question.
+        5. **Conclusion**: End the interview. 
         
         RULES:
         - ONE question at a time.
