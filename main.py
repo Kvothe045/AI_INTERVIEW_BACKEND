@@ -121,7 +121,7 @@ class InterviewSession:
         
         INTERVIEW STRUCTURE:
         0. Introduction: Say "I am {self.persona['name']}...".
-        1. Intro Question: Ask 1 relevant intro/behavioral question.
+        1. Intro Question: Ask the candidate to introduce themself and ask 1 relevant intro/behavioral question.
         2. **DSA & Problem Solving(if applicable)**: Use the JD to set the difficulty. Minimum 2 main dsa/problem-solving question. Ask rigorous questions with one cross-question on it if seems feasible, always rely on last response.
         3. **Resume Deep Dive**: Drill down into skills+projects+other key things.
         4. **Conceptual Questions**: Ask 3 standard medium to medium-hard to hard questions for this role based on internet searches(past experiences).Cross question when needed.
@@ -175,7 +175,18 @@ class InterviewSession:
         return ai_text, is_finished
 
     async def generate_feedback(self):
-        prompt = "Provide detailed feedback: Strengths, Weaknesses, Improvements, Resume Score (0-100), Final Remarks."
+        # prompt = "Provide detailed feedback: First providing analysis of Strengths, Weaknesses, Improvements, Resume Score (0-100), Final Remarks. Be constructive."
+        prompt = """
+        Based on the entire transcript, provide detailed feedback as a mentor/guide to the student/interviewee.
+        Structure:
+        1. **Strengths**
+        2. **Weaknesses**
+        3. **Improvements**
+        4. **Resources**
+        5. **RESUME Feedback and MATCHING SCORE with JD and is the resume potential enough to get accepted against ATS filters for this role** (0-100%)
+        6. **RESUME IMPROVEMENT SUGGESTIONS**
+        7. **FINAL REMARKS**
+        """
         response = await self.chat.send_message(prompt)
         return clean_text_for_tts(response.text)
 
