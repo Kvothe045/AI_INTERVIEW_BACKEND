@@ -11,6 +11,7 @@ from gtts import gTTS
 from fastapi import FastAPI, WebSocket, UploadFile, File, Form, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict
+import urllib.request
 from dotenv import load_dotenv
 
 # --- NEW SDK IMPORTS ---
@@ -122,7 +123,7 @@ class InterviewSession:
         INTERVIEW STRUCTURE:
         0. Introduction: Say "I am {self.persona['name']}...".
         1. Intro Question: Ask the candidate to introduce themself and ask 1 relevant intro/behavioral question.
-        2. **DSA & Problem Solving(if applicable)**: Use the JD to set the difficulty. Minimum 2 main dsa/problem-solving question. Ask rigorous questions with one cross-question on it if seems feasible, always rely on last response.
+        2. **DSA & Problem Solving(if applicable)**: Use the JD to set the difficulty. AVOID TOUCHE QUESTIONS, keep a varied variety random topics of questions of dsa, ranging from linear to non-linear data structures, be random. Minimum 2 main dsa/problem-solving question. Ask rigorous questions with one cross-question on it if seems feasible, always rely on last response.
         3. **Resume Deep Dive**: Drill down into skills+projects+other key things.
         4. **Conceptual Questions**: Ask 3 standard medium to medium-hard to hard questions for this role based on internet searches(past experiences).Cross question when needed.
         6. **System Design**: If for this role in real-world in past system design applicable then, ask 1 system design question.
@@ -190,17 +191,21 @@ class InterviewSession:
         response = await self.chat.send_message(prompt)
         return clean_text_for_tts(response.text)
 
+# ... (Imports remain the same)
+
 # --- 3-LAYER AUDIO GENERATION ---
 async def generate_audio_stream(text: str, voice_id: str, backup_tld: str) -> str:
     """
-    1. EdgeTTS (Best, Male/Female) - Timeout 1.5s
-    2. gTTS Accented (Reliable, always Female) - Timeout 3s
+    1. EdgeTTS (Best, Male/Female) - Timeout 10s
+    2. gTTS Accented (Reliable, always Female) - Timeout 10s
     3. gTTS US Standard (Ultimate Backup)
     """
     
+    # print(f"🎤 Generating Audio: {text[:30]}...") # Debug log
+
     # --- LAYER 1: EdgeTTS (High Quality) ---
     try:
-        # We set a VERY strict timeout. If it lags, we skip it instantly.
+        # Create the communicate object
         communicate = edge_tts.Communicate(text, voice_id)
         mp3_data = b""
         
@@ -210,36 +215,44 @@ async def generate_audio_stream(text: str, voice_id: str, backup_tld: str) -> st
                 if chunk["type"] == "audio":
                     mp3_data += chunk["data"]
         
-        # Strict 1.5s timeout. If Render network is slow, drop it.
-        await asyncio.wait_for(run_edge(), timeout=1.5)
+        # INCREASED TIMEOUT TO 10 SECONDS
+        await asyncio.wait_for(run_edge(), timeout=5.0)
         
         if len(mp3_data) > 0:
+            print("✅ EdgeTTS Success")
             return base64.b64encode(mp3_data).decode("utf-8")
             
-    except (asyncio.TimeoutError, Exception) as e:
-        print(f"⚠️ Layer 1 (EdgeTTS) Failed/Slow: {e}")
-
-    # --- LAYER 2: gTTS (Accented) ---
-    try:
-        def run_gtts_accent():
-            fp = io.BytesIO()
-            # gTTS is reliable but synchronous, run in thread
-            tts = gTTS(text=text, lang='en', tld=backup_tld)
-            tts.write_to_fp(fp)
-            fp.seek(0)
-            return fp.read()
-
-        gtts_data = await asyncio.wait_for(
-            asyncio.to_thread(run_gtts_accent), 
-            timeout=3.0
-        )
-        return base64.b64encode(gtts_data).decode("utf-8")
-
+    except asyncio.TimeoutError:
+        print("⚠️ Layer 1 (EdgeTTS) TIMEOUT - Server was too slow.")
     except Exception as e:
-        print(f"⚠️ Layer 2 (gTTS Accent) Failed: {e}")
+        print(f"⚠️ Layer 1 (EdgeTTS) Error: {str(e)}")
+
+    # # --- LAYER 2: gTTS (Accented) ---
+    # try:
+    #     def run_gtts_accent():
+    #         fp = io.BytesIO()
+    #         # gTTS is reliable but synchronous, run in thread
+    #         tts = gTTS(text=text, lang='en', tld=backup_tld)
+    #         tts.write_to_fp(fp)
+    #         fp.seek(0)
+    #         return fp.read()
+
+    #     # INCREASED TIMEOUT TO 10 SECONDS
+    #     gtts_data = await asyncio.wait_for(
+    #         asyncio.to_thread(run_gtts_accent), 
+    #         timeout=7.0
+    #     )
+    #     print("✅ gTTS (Accent) Success")
+    #     return base64.b64encode(gtts_data).decode("utf-8")
+
+    # except asyncio.TimeoutError:
+    #      print("⚠️ Layer 2 (gTTS) TIMEOUT - Google was too slow.")
+    # except Exception as e:
+    #     print(f"⚠️ Layer 2 (gTTS Accent) Failed: {str(e)}")
 
     # --- LAYER 3: gTTS (Standard US - Failsafe) ---
     try:
+        print("🔄 Falling back to Standard US gTTS...")
         def run_gtts_std():
             fp = io.BytesIO()
             tts = gTTS(text=text, lang='en', tld='us')
@@ -247,11 +260,12 @@ async def generate_audio_stream(text: str, voice_id: str, backup_tld: str) -> st
             fp.seek(0)
             return fp.read()
 
+        # No timeout here, we MUST return something
         gtts_data = await asyncio.to_thread(run_gtts_std)
         return base64.b64encode(gtts_data).decode("utf-8")
         
     except Exception as e:
-        print(f"❌ ALL AUDIO LAYERS FAILED: {e}")
+        print(f"❌ ALL AUDIO LAYERS FAILED: {str(e)}")
         return "" # Frontend will just show text
 
 # --- API ENDPOINTS ---
@@ -287,6 +301,27 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         return
 
     session = sessions[session_id]
+    
+    # --- KEEP ALIVE PINGER (PREVENT SLEEP) ---
+    async def keep_alive_ping():
+        """Pings the server every 60 seconds to prevent Render sleeping"""
+        while True:
+            await asyncio.sleep(60)
+            try:
+                # Resolve local port (default 8000)
+                port = int(os.getenv("PORT", 8000))
+                # Open raw socket connection to localhost (No external libs needed)
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
+                # Send simple HTTP 1.1 GET request
+                writer.write(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+                await writer.drain()
+                writer.close()
+                await writer.wait_closed()
+            except Exception:
+                pass # Fail silently, main loop continues
+
+    # Start the pinger background task
+    ping_task = asyncio.create_task(keep_alive_ping())
 
     try:
         # Initial Question
@@ -330,3 +365,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         if session_id in sessions: del sessions[session_id]
         print(f"Session {session_id} disconnected")
+    finally:
+        # Stop the pinger when connection closes
+        ping_task.cancel()
